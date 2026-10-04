@@ -1,0 +1,48 @@
+{
+  "index_patterns": ["honeypot-rdpy-*"],
+  "template": {
+    "mappings": {
+      "properties": {
+        "@timestamp":    {"type": "date"},
+        "src_ip":        {"type": "ip", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+        "src_port":      {"type": "integer"},
+        "username":      {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+        "password":      {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+        "domain":        {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+        "hostname":      {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+        "honeypot":      {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+        "honeypot_type": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+        "protocol":      {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+        "event_type":    {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+        "dest_port":     {"type": "integer"},
+        "message":       {"type": "text"},
+        "geoip": {
+          "properties": {
+            "geo": {
+              "properties": {
+                "city_name":        {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                "country_name":     {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                "country_iso_code": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                "location":         {"type": "geo_point"}
+              }
+            }
+          }
+        },
+        "asn": {
+          "properties": {
+            "as": {
+              "properties": {
+                "number": {"type": "long"},
+                "organization": {
+                  "properties": {
+                    "name": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

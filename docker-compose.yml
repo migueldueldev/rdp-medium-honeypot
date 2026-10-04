@@ -1,0 +1,123 @@
+networks:
+  honeypot:
+    driver: bridge
+  analysis:
+    driver: bridge
+
+volumes:
+  esdata:
+
+services:
+
+  # GeoIP database downloader
+  geoip-db:
+    image: curlimages/curl:latest
+    user: root
+    volumes:
+      - ./geoip/data:/geoip
+      - ./geoip/download.sh:/download.sh
+    environment:
+      MAXMIND_ACCOUNT_ID: ${MAXMIND_ACCOUNT_ID}
+      MAXMIND_LICENSE_KEY: ${MAXMIND_LICENSE_KEY}
+    command: ["/bin/sh", "/download.sh"]
+    networks:
+      - analysis
+
+  # ElasticSearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.13
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - cluster.name=rdp-medium-honeypot-cluster
+      - node.name=rdp-medium-honeypot
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - analysis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Logstash
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.19.13
+    volumes:
+      - ./logstash/logstash.yml:/usr/share/logstash/config/logstash.yml
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./geoip/data:/geoip
+    networks:
+      - honeypot
+      - analysis
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      geoip-db:
+        condition: service_completed_successfully
+
+  # Kibana dashboards
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.19.13
+    volumes:
+      - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml
+      - ./kibana/dashboards:/dashboards
+    ports:
+      - "127.0.0.1:5601:5601"
+    networks:
+      - analysis
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  # Import Kibana dashboard
+  kibana-import:
+    image: curlimages/curl:latest
+    user: root
+    networks:
+      - analysis
+    depends_on:
+      - kibana
+    volumes:
+    - ./kibana/dashboards:/dashboards
+    - ./kibana/templates:/templates
+    - ./kibana/import.sh:/import.sh
+    command: ["/bin/sh", "/import.sh"]
+
+  # RDPY honeypot
+  honeypot:
+    build:
+      context: ./honeypot
+    volumes:
+      - ./data/logs:/data/logs
+      - ./data/pcaps:/data/pcaps
+      - ./data/rss:/honeypot/rss
+    environment:
+      RSS_FILE: ${RSS_FILE}
+    ports:
+      - "0.0.0.0:3389:3389"
+    networks:
+      - honeypot
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    security_opt:
+      - apparmor:unconfined
+    depends_on:
+      - logstash
+
+  # Filebeat
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.19.13
+    user: root
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./data/logs:/data/logs:ro
+    networks:
+      - honeypot
+    depends_on:
+      - honeypot
+      - logstash
+    command: filebeat -e --strict.perms=false

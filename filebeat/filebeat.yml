@@ -1,0 +1,18 @@
+filebeat.inputs:
+  - type: filestream
+    id: rdpy-honeypot-input
+    enabled: true
+    paths:
+      - /data/logs/rdpy.json
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
+    tags: ["rdpy", "honeypot"]
+    prospector.scanner.check_interval: 1s
+
+output.logstash:
+  hosts: ["logstash:5044"]
+  bulk_max_size: 1
+
+logging.level: info
